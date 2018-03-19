@@ -1,9 +1,10 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from forward import forward_propagation
-from backward import backward_propagation
+from forward import forward_propagation, forward_propagation_with_dropout
+from backward import backward_propagation, backward_propagation_with_dropout
 from gradcheck import gradient_check
+from optimizer import update_parameters_with_gd, initialize_adam, update_parameters_with_adam
 
 def one_hot_matrix(labels, C):
     one_hot = np.zeros((labels.shape[0], C))
@@ -69,21 +70,12 @@ def compute_cost_with_regularization(AL, Y, parameters, lambd):
         
     cost = cross_entropy_cost + L2_regularization_cost
     return cost
-        
-
-def update_parameters_with_gd(parameters, grads, learning_rate):
-    L = len(parameters) // 2
-    
-    for l in range(L):
-        parameters["W" + str(l+1)] += - learning_rate * grads["dW" + str(l+1)]
-        parameters["b" + str(l+1)] += - learning_rate * grads["db" + str(l+1)]
-        
-    return parameters
 
 def L_layer_model(X, Y, layer_dims, optimizer, learning_rate = 0.0075, mini_batch_size = 64, 
                   beta = 0.9, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8, num_epochs = 3000, 
                   print_cost=True, lambd = 0, keep_prob = 1, gradcheck = 0):
     grads = {}
+    dropout =  {}
     costs =  []
     t = 0 #initializing the counter for Adam 
     m = X.shape[1]
@@ -95,8 +87,8 @@ def L_layer_model(X, Y, layer_dims, optimizer, learning_rate = 0.0075, mini_batc
     #Initialize the optimizer
     if optimizer == "gd":
         pass
-    #elif optimizer == "adam": 
-    #    v,s = initialize_adam(parameters)
+    elif optimizer == "adam": 
+        v,s = initialize_adam(parameters)
     
     #Optimization loop
     for i in range(0, num_epochs):
@@ -111,8 +103,8 @@ def L_layer_model(X, Y, layer_dims, optimizer, learning_rate = 0.0075, mini_batc
             #Forward propagation
             if keep_prob == 1:
                 AL, caches = forward_propagation(minibatch_X, parameters)
-            #elif keep_prob < 1:
-            #    AL, caches = forward_propagation_with_dropout(X, parameters, keep_prob)
+            elif keep_prob < 1:
+                AL, caches, dropout = forward_propagation_with_dropout(minibatch_X, parameters, keep_prob)
             
             #Compute cost
             if lambd == 0:
@@ -120,25 +112,28 @@ def L_layer_model(X, Y, layer_dims, optimizer, learning_rate = 0.0075, mini_batc
             else:
                 cost = compute_cost_with_regularization(AL, minibatch_Y, parameters, lambd)
             
-            #Backward propagation
-            grads = backward_propagation(AL, minibatch_Y, caches, lambd)
+            #Backward propagation           
+            if keep_prob == 1:
+                grads = backward_propagation(AL, minibatch_Y, caches, lambd)
+            elif keep_prob < 1:
+                grads = backward_propagation_with_dropout(AL, minibatch_Y, caches, lambd, keep_prob, dropout)
             
             #Gradient check
-            if gradcheck == 1 and i == 0:
-                print("Gradient check ...")
-                difference = gradient_check(parameters, grads, minibatch_X, minibatch_Y)
+           # if gradcheck == 1 and i == 0:
+           #     print("Gradient check ...")
+           #     difference = gradient_check(parameters, grads, minibatch_X, minibatch_Y)
             
             #Update parameters
             if optimizer == "gd":
                 parameters = update_parameters_with_gd(parameters, grads, learning_rate)
-            #elif optimizer == "adam":
-            #    t += 1
-            #    parameters, v, s= update_paramters_with_adam(parameters, grads, v, s, t, learning_rate, beta1, beta2, epsilon)
+            elif optimizer == "adam":
+                t += 1
+                parameters, v, s = update_parameters_with_adam(parameters, grads, v, s, t, learning_rate, beta1, beta2, epsilon)
         
         #Print cost every 100 training example
-        if print_cost and i % 1000 == 0:
-            print ("Cost after iteration %i: %f" %(i, cost))
         if print_cost and i % 100 == 0:
+            print ("Cost after iteration %i: %f" %(i, cost))
+        if print_cost and i % 10 == 0:
             costs.append(cost)
             
     # plot the cost

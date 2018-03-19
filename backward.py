@@ -58,7 +58,6 @@ def backward_propagation(AL, Y, caches, lambd):
     current_cache = caches[L-1]
     grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, "softmax", lambd)
     
-    # Loop from l = L2 to l=0
     for l in reversed(range(L-1)):
         current_cache = caches[l]
         dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l + 1)], current_cache, "relu", lambd)
@@ -68,3 +67,27 @@ def backward_propagation(AL, Y, caches, lambd):
         
     return grads
     
+def backward_propagation_with_dropout(AL, Y, caches, lambd, keep_prob, dropout):
+    grads = {}
+    L = len(caches)
+    Y = Y.reshape(AL.shape)
+    
+    #Initializing the backpropagation
+    dAL = AL - Y
+    
+    #Lth Layer
+    current_cache = caches[L-1]
+    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, "softmax", lambd)
+    grads["dA" + str(L-1)] = grads["dA" + str(L-1)] * dropout["D" + str(L-1)]
+    grads["dA" + str(L-1)] = grads["dA" + str(L-1)] / keep_prob
+    
+    for l in reversed(range(L-1)):
+        current_cache = caches[l]
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l + 1)], current_cache, "relu", lambd)
+        dA_prev_temp = dA_prev_temp * dropout["D" + str(l)]
+        dA_prev_temp = dA_prev_temp / keep_prob 
+        grads["dA" + str(l)] = dA_prev_temp
+        grads["dW" + str(l+1)] = dW_temp
+        grads["db" + str(l+1)] = db_temp
+        
+    return grads

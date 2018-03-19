@@ -47,3 +47,26 @@ def forward_propagation(X, parameters):
     assert(AL.shape[1] == X.shape[1])
     
     return AL, caches
+
+def forward_propagation_with_dropout(X, parameters, keep_prob = 0.5):
+    caches = []
+    dropout = {}
+    dropout["D0"] = np.random.rand(X.shape[0], X.shape[1])
+    A = X
+    L = len(parameters) // 2
+    
+    for l in range(1, L):
+        A_prev = A
+        A, cache = linear_activation_forward(A_prev, parameters["W" + str(l)], parameters["b" + str(l)], "relu")
+        D = np.random.rand(A.shape[0], A.shape[1])
+        D = (D < keep_prob)
+        A = A * D
+        A = A / keep_prob
+        dropout["D" + str(l)] = D
+        caches.append(cache)
+        
+    AL, cache = linear_activation_forward(A, parameters["W" + str(L)], parameters["b" + str(L)], "softmax")
+    caches.append(cache)
+    assert(AL.shape[1] == X.shape[1])
+    
+    return AL, caches, dropout
